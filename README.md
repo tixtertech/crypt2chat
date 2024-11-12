@@ -9,6 +9,7 @@
 - [Architecture](#architecture)
   - [Client](#client)
   - [Server](#server)
+- [dependencies](#dependencies)
 - [Future Improvements](#future-improvements)
 - [Contributing](#contributing)
 - [License](#license)
@@ -58,9 +59,7 @@ crypt2chat is built on a modular client-server architecture, optimizing for secu
 
 The server only serves as a message relay and storage hub, holding encrypted messages without any capability to decrypt or alter them.
 
-## Setup and Installation
-
-### Requirements
+## Dependencies
 
 To run **crypt2chat**, all the necessary dependencies are listed in the `requirements.txt` file. Please consult this file for the complete list of Python packages required to run both the client and the server.
 
