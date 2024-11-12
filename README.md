@@ -9,7 +9,7 @@
 - [Architecture](#architecture)
   - [Client](#client)
   - [Server](#server)
-- [dependencies](#dependencies)
+- [Dependencies](#dependencies)
 - [Future Improvements](#future-improvements)
 - [Contributing](#contributing)
 - [License](#license)
