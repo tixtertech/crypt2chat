@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="https://fastapi.tiangolo.com/img/favicon.png">
+    <title>FastAPI - Server Unavailable</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: white;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        h1 {
+            color: black;
+            font-size: 40px;
+            margin-bottom: 20px;
+        }
+
+        .error-box {
+            border: 2px solid #ff4c4c;
+            background-color: #fff0f0;
+            color: #333;
+            padding: 20px;
+            max-width: 70%;
+            margin: 0 auto;
+            font-size: 18px;
+            border-radius: 8px;
+        }
+
+        .error-box p {
+            margin: 0;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Server Unavailable</h1>
+        <div class="error-box">
+            <p id="error_message">in progress...</p>
+            <script>
+                fetch('/ping')
+                    .then(response => {
+                        return response.text();
+                    })
+                    .then(data => {
+                        document.getElementById('error_message').innerText = data;
+                    })
+                    .catch(error => {
+                        document.getElementById('error_message').innerText = 'Loading error: ' + error.message;
+                    });
+            </script>
+        </div>
+    </div>
+</body>
+</html>
