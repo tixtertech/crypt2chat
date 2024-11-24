@@ -1,11 +1,37 @@
 import logging
 import logging.config
 import os
+import time
+from datetime import datetime, timezone, timedelta
 
 
 class Logging:
+    def get_timestamp(self, line):
+        try:
+            return datetime.strptime(line.split(' - ')[0], "%Y-%m-%d %H:%M:%S,%f").replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None
+
+    def clear_logs(self):
+        if os.path.exists(self.log_file):
+            current_time = datetime.now(timezone.utc)
+            delta = current_time - timedelta(days=1)
+
+            with open(self.log_file, 'r') as f:
+                lines = f.readlines()
+
+            index = len(lines)
+            for i, line in enumerate(lines):
+                if line:
+                    timestamp = self.get_timestamp(line)
+                    if timestamp and timestamp >= delta:
+                        index = min(index, i)
+            with open(self.log_file, 'w') as f:
+                f.writelines(lines[index:])
+
     def __init__(self, log_file):
         self.log_file = log_file
+        self.clear_logs()
 
         logging.config.dictConfig({
             'version': 1,
@@ -35,6 +61,7 @@ class Logging:
                 }
             }
         })
+        logging.Formatter.converter = time.gmtime
 
     def app_debug(self, *args, **kwargs):
         logging.getLogger('app_logger').debug(*args, **kwargs)

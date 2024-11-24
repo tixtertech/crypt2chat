@@ -1,1 +1,1 @@
-from .manager import TokenManager, user_challenge, admin_challenge
+from .manager import TokenManager, AdminChallenge, UserChallenge

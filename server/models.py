@@ -5,22 +5,19 @@ class Register(BaseModel):
     authentication_key: str
     identity_key: str
     identity_sig: str
-    signed_pre_keys: str
 
 class Verify(BaseModel):
-    challenge: str
-    signed_challenge: str
+    authenticated_challenge: str
 
 class ChangeUsername(BaseModel):
-    user_id: str
     new_username: str
+
 class SignedPreKeys(BaseModel):
-    user_id: str
-    signed_pre_keys: bytes
+    signed_pre_keys: str
 
 class SendMessage(BaseModel):
     conversation_id: str
-    content: bytes
+    content: str
 
 class Delivered(BaseModel):
     messages_ids: list

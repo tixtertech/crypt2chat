@@ -2,23 +2,23 @@ import os
 
 from fastapi import APIRouter, Query
 
-from server.auth import admin_challenge
+from server.auth import AdminChallenge
 from server.exceptions import *
 from server.models import *
 from server.users.manager import UsersManager
 
 router = APIRouter()
 users_manager = UsersManager(os.getenv("SERVER_USERS_DB"))
+admin_challenge = AdminChallenge()
 
 @router.post("/verify")
 @http_error_handler({
-    admin_challenge.UnauthorizedError: status.HTTP_401_UNAUTHORIZED,
+    admin_challenge.AccessForbiddenError: status.HTTP_401_UNAUTHORIZED,
     admin_challenge.BadRequestError: status.HTTP_400_BAD_REQUEST
 })
 async def verify(base_model: Verify):
     return admin_challenge.verify_challenge(
-        challenge=base_model.challenge,
-        signed_challenge=base_model.signed_challenge
+        authenticated_challenge=base_model.authenticated_challenge,
     )
 
 @router.patch("/freeze-account")

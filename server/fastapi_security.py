@@ -1,20 +1,19 @@
 import os
-import traceback
 
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi.openapi.utils import get_openapi
 from fastapi.security import OAuth2
-from jose import jwt
 
+from common.security import APIToken
 from server.auth import TokenManager
 from server.exceptions import *
 
 
 class TokenBearer(OAuth2):
-    def __init__(self, auth_manager: TokenManager):
+    def __init__(self, token_manager: TokenManager):
         super().__init__()
-        self.auth_manager = auth_manager
+        self.token_manager = token_manager
 
     async def __call__(self, request: Request):
         token = request.headers.get("Authorization")
@@ -34,25 +33,30 @@ class TokenBearer(OAuth2):
                 detail="Authorization header must start with 'Bearer '",
                 headers={"WWW-Authenticate": "Bearer"}
             )
-
         try:
-            payload = self.auth_manager.verify_token(token)
+            body = await request.body()
+            payload = self.token_manager.verify_token(
+                token=token,
+                method=request.method,
+                url=str(request.url),
+                body=body,
+            )
+        except APIToken.APITokenError as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=str(type(e)),
+                headers={"WWW-Authenticate": "Bearer"}
+            )
+        except ReplayAttackError:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Replay attack detected",
+                headers={"WWW-Authenticate": "Bearer"}
+            )
         except CodeInjectionError:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Code injection suspicion",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        except BlacklistedTokenError:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token has been blacklisted",
-                headers={"WWW-Authenticate": "Bearer"}
-            )
-        except jwt.JWTError as e:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail=str(e),
                 headers={"WWW-Authenticate": "Bearer"}
             )
         except:

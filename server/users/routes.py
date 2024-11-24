@@ -1,11 +1,11 @@
 import os
 from datetime import datetime
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 
-from server.auth import user_challenge
 from server.exceptions import *
-from server.models import ChangeUsername, SignedPreKeys
+from server.fastapi_security import oauth2_scheme
+from server.models import *
 from server.users.manager import UsersManager
 
 router = APIRouter()
@@ -37,45 +37,22 @@ async def get_signed_pre_key(
 
 @router.put("/signed-pre-key")
 @http_error_handler()
-async def renew_signed_pre_key(base_model: SignedPreKeys):
-    user = users_manager.get_details(user_id=base_model.user_id)
-    return user_challenge.get_challenge(
-        authentication_key=user["authentication_key"],
-        identity_key=user["identity_key"],
-        function=users_manager.renew_signed_pre_keys,
-        args=[],
-        kwargs={
-            'user_id': base_model.user_id,
-            'signed_pre_keys': base_model.signed_pre_keys
-        }
+async def renew_signed_pre_key(base_model: SignedPreKeys, token: dict = Depends(oauth2_scheme)):
+    return users_manager.renew_signed_pre_keys(
+            user_id=token.get("sub"),
+            signed_pre_keys=base_model.signed_pre_keys
     )
 
 @router.put("/change-username")
 @http_error_handler()
-async def change_username(base_model: ChangeUsername):
-    user = users_manager.get_details(user_id=base_model.user_id)
-    return user_challenge.get_challenge(
-        authentication_key=user["authentication_key"],
-        identity_key=user["identity_key"],
-        function=users_manager.change_username,
-        args=[],
-        kwargs={
-            'user_id': base_model.user_id,
-            'new_username': base_model.new_username
-        }
+async def change_username(base_model: ChangeUsername, token: dict = Depends(oauth2_scheme)):
+    return users_manager.change_username(
+        user_id=token.get("sub"),
+        new_username=base_model.new_username
     )
 
 
 @router.delete("/delete-account")
 @http_error_handler()
-async def delete_account(
-        user_id: str = Query(None, alias="user_id"),
-):
-    user = users_manager.get_details(user_id=user_id)
-    return user_challenge.get_challenge(
-        authentication_key=user["authentication_key"],
-        identity_key=user["identity_key"],
-        function=users_manager.delete_account,
-        args=[],
-        kwargs={'user_id': user_id}
-    )
+async def delete_account(token: dict = Depends(oauth2_scheme)):
+    return users_manager.delete_account(user_id=token.get("sub"))

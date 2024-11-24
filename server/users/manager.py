@@ -1,3 +1,4 @@
+import base64
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -79,9 +80,9 @@ class UsersManager:
             cursor.execute('''
                 INSERT OR REPLACE INTO users (user_id, username, authentication_key, identity_key, identity_sig, signed_pre_keys, since, frozen) 
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (user_id, username, authentication_key, identity_key, identity_sig, datetime.now(timezone.utc), False))
+            ''', (user_id, username, authentication_key, identity_key, identity_sig, None, datetime.now(timezone.utc), False))
             conn.commit()
-        return f"{username} registered"
+        return user_id
 
     @anti_code_injection(in_case_raise=CodeInjectionError)
     def change_username(self, user_id:str, username:str):
@@ -98,15 +99,16 @@ class UsersManager:
             conn.commit()
 
     @anti_code_injection(in_case_raise=CodeInjectionError)
-    def renew_signed_pre_keys(self, user_id:str, signed_pre_keys:bytes):
+    def renew_signed_pre_keys(self, user_id:str, signed_pre_keys:str):
         if self.is_account_frozen(user_id):
             raise FrozenAccountError("This account has been frozen. Please contact support.")
         if not self.is_user_id_taken(user_id):
             raise NotFoundError(f"user {user_id} not found")
 
+        decoded_signed_pre_keys = base64.b64decode(signed_pre_keys.encode())
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
-            cursor.execute('UPDATE users SET signed_pre_keys = ? WHERE user_id = ?', (user_id,signed_pre_keys,))
+            cursor.execute('UPDATE users SET signed_pre_keys = ? WHERE user_id = ?', (decoded_signed_pre_keys,user_id))
             conn.commit()
 
     @anti_code_injection(in_case_raise=CodeInjectionError)
@@ -181,7 +183,7 @@ class UsersManager:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             query = """
-                SELECT *
+                SELECT user_id, username, authentication_key, identity_key, identity_sig, since
                 FROM users
                 WHERE 1=1
                 """

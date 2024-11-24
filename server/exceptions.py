@@ -1,7 +1,11 @@
+import traceback
 from functools import wraps
 from typing import Optional, Dict, Type
 
+from colorama import Fore, Style
 from fastapi import HTTPException, status
+
+from server.logging import logging_
 
 
 class Crypt2chatError(ValueError):
@@ -10,7 +14,10 @@ class Crypt2chatError(ValueError):
 class UnauthorizedError(Crypt2chatError):
     pass
 
-class BlacklistedTokenError(Crypt2chatError):
+class AccessForbiddenError(Crypt2chatError):
+    pass
+
+class ReplayAttackError(Crypt2chatError):
     pass
 
 class DataBaseError(Crypt2chatError):
@@ -32,7 +39,8 @@ class FrozenAccountError(Crypt2chatError):
 def http_error_handler(error_mapping: Optional[Dict[Type[Exception], int]] = None,):
     error_mapping_ = {
         UnauthorizedError: status.HTTP_401_UNAUTHORIZED,
-        BlacklistedTokenError: status.HTTP_403_FORBIDDEN,
+        AccessForbiddenError: status.HTTP_403_FORBIDDEN,
+        ReplayAttackError: status.HTTP_403_FORBIDDEN,
         FrozenAccountError: status.HTTP_403_FORBIDDEN,
         AlreadyTakenError: status.HTTP_409_CONFLICT,
         NotFoundError: status.HTTP_404_NOT_FOUND,
@@ -58,6 +66,13 @@ def http_error_handler(error_mapping: Optional[Dict[Type[Exception], int]] = Non
                 if status_code is None:
                     status_code = status.HTTP_500_INTERNAL_SERVER_ERROR
 
-                raise HTTPException(status_code=status_code, detail=str(e))
+                if status_code >= 500:
+                    logging_.app_error(f"{traceback.format_exc()}")
+                    print(Fore.RED + "ERROR" + Style.RESET_ALL + f":\t{traceback.format_exc()}")
+                else:
+                    logging_.app_warning(f"{traceback.format_exc()}")
+                    print(Fore.YELLOW + "WARNING" + Style.RESET_ALL + f":\t{type(e)}: {e}")
+
+                raise HTTPException(status_code=status_code, detail=f"{type(e)}: {e}")
         return wrapper
     return decorator

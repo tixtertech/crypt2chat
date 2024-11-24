@@ -9,6 +9,7 @@ import time
 from fastapi import FastAPI, Response, Request
 from fastapi.responses import FileResponse
 
+from server.keys.routes import router as keys_router
 from server.admin.routes import router as admin_router
 from server.auth.routes import router as auth_router
 from server.fastapi_security import custom_openapi
@@ -34,7 +35,7 @@ async def log_requests(request: Request, call_next):
         process_time = time.time() - start_time
         if response.status_code >= 500:
             logging_.middleware_error(
-                f"Error: {response.content}"
+                f"Error: Status {response.status_code}"
             )
         logging_.middleware_info(
             f"Response: {response.status_code} for {request.method} {request.url} "
@@ -64,9 +65,10 @@ if not int(os.getenv("SERVER_STATUS")) == 503:
 
     # Include routers
     app.include_router(admin_router, prefix="/admin", tags=["admin"])
+    app.include_router(keys_router, prefix="/keys", tags=["keys"])
+    app.include_router(auth_router, prefix="/auth", tags=["auth"])
     app.include_router(accounts_router, prefix="/users", tags=["users"])
     app.include_router(messaging_router, prefix="/messaging", tags=["messaging"])
-    app.include_router(auth_router, prefix="/auth", tags=["auth"])
 
 else:
     @app.get("/")
@@ -77,7 +79,7 @@ uvicorn.run(
     app,
     host=os.getenv("SERVER_HOST"),
     port=int(os.getenv("SERVER_PORT")),
-    ssl_keyfile=os.getenv("SERVER_PRIVKEY"),
+    ssl_keyfile=os.getenv("SERVER_RSA_PRV"),
     ssl_keyfile_password=os.getenv("SERVER_PASSWORD"),
     ssl_certfile=os.getenv("SERVER_CERT")
     )
