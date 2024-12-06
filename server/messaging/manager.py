@@ -1,4 +1,5 @@
 import json
+import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -12,6 +13,7 @@ from server.users import UsersManager
 class MessagesManager:
     def __init__(self, db_path):
         self.db_path = db_path
+        self.users_manager = UsersManager(os.getenv("SERVER_USERS_DB"))
         self._init_db()
 
     def _init_db(self):
@@ -46,14 +48,14 @@ class MessagesManager:
 
     @anti_code_injection(in_case_raise=CodeInjectionError)
     def create_conversation(self, creator_id: str, members: List[str], name: str) -> str:
-        users_manager = UsersManager()
-        if users_manager.is_account_frozen(creator_id):
+
+        if self.users_manager.is_account_frozen(creator_id):
             raise FrozenAccountError("This account has been frozen. Please contact support.")
         if creator_id not in members:
             members.append(creator_id)
 
         for member in members:
-            if not users_manager.is_user_id_taken(member):
+            if not self.users_manager.is_user_id_taken(member):
                 raise NotFoundError(f"User {member} not found")
 
         conversation_id = str(uuid.uuid4())
@@ -65,7 +67,7 @@ class MessagesManager:
                 cursor = conn.cursor()
                 cursor.execute('''
                     INSERT INTO conversations (conversation_id, name, created_at, members)
-                    VALUES (%s, %s, %s, %s)
+                    VALUES (?, ?, ?, ?)
                 ''', (conversation_id, name, created_at, members_json))
                 conn.commit()
                 return conversation_id
@@ -79,7 +81,7 @@ class MessagesManager:
                 cursor = conn.cursor()
 
                 # Check if conversation exists and sender is a member
-                cursor.execute('SELECT members FROM conversations WHERE conversation_id = %s', (conversation_id,))
+                cursor.execute('SELECT members FROM conversations WHERE conversation_id = ?', (conversation_id,))
                 result = cursor.fetchone()
                 if not result:
                     raise NotFoundError("Conversation not found")
@@ -97,7 +99,7 @@ class MessagesManager:
                 # Insert the new message in conversation's table
                 cursor.execute('''
                     INSERT INTO messages (message_id, conversation_id, sender, timestamp, content, delivery_status)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                    VALUES (?, ?, ?, ?, ?, ?)
                 ''', (message_id, conversation_id, sender, timestamp, content, json.dumps(delivery_status)))
                 conn.commit()
                 return message_id
@@ -113,7 +115,7 @@ class MessagesManager:
                 # Get all conversations where user is a member
                 cursor.execute('''
                     SELECT conversation_id FROM conversations 
-                    WHERE members @> %s::jsonb
+                    WHERE members @> ?::jsonb
                 ''', (json.dumps([user_id]),))
 
                 conversations = cursor.fetchall()
@@ -124,7 +126,7 @@ class MessagesManager:
                     cursor.execute('''
                         SELECT message_id, sender, timestamp, content
                         FROM messages
-                        WHERE conversation_id = %s AND delivery_status->>%s = 'false'
+                        WHERE conversation_id = ? AND delivery_status->>? = 'false'
                     ''', (conv_id, user_id))
 
                     messages = cursor.fetchall()
@@ -150,7 +152,7 @@ class MessagesManager:
                 cursor.execute('''
                     SELECT conversation_id, sender, timestamp, content, delivery_status
                     FROM messages
-                    WHERE message_id = %s
+                    WHERE message_id = ?
                 ''', (message_id,))
 
                 result = cursor.fetchone()
@@ -159,7 +161,7 @@ class MessagesManager:
 
                 conversation_id, sender, timestamp, content, delivery_status = result
 
-                cursor.execute('SELECT members FROM conversations WHERE conversation_id = %s', (conversation_id,))
+                cursor.execute('SELECT members FROM conversations WHERE conversation_id = ?', (conversation_id,))
                 members_result = cursor.fetchone()
                 if not members_result or user_id not in json.loads(members_result[0]):
                     raise UnauthorizedError("You do not have access to this message")
@@ -183,7 +185,7 @@ class MessagesManager:
 
                 cursor.execute('''
                     SELECT sender FROM messages
-                    WHERE message_id = %s
+                    WHERE message_id = ?
                 ''', (message_id,))
                 result = cursor.fetchone()
 
@@ -197,7 +199,7 @@ class MessagesManager:
 
                 cursor.execute('''
                     DELETE FROM messages
-                    WHERE message_id = %s
+                    WHERE message_id = ?
                 ''', (message_id,))
                 conn.commit()
 
@@ -211,13 +213,13 @@ class MessagesManager:
                 cursor = conn.cursor()
 
                 for message_id in messages_ids:
-                    cursor.execute('SELECT conversation_id FROM messages WHERE message_id = %s', (message_id,))
+                    cursor.execute('SELECT conversation_id FROM messages WHERE message_id = ?', (message_id,))
                     result = cursor.fetchone()
                     if not result:
                         raise NotFoundError(f"Message {message_id} not found")
                     conversation_id = result[0]
 
-                    cursor.execute('SELECT members FROM conversations WHERE conversation_id = %s', (conversation_id,))
+                    cursor.execute('SELECT members FROM conversations WHERE conversation_id = ?', (conversation_id,))
                     result = cursor.fetchone()
                     if not result:
                         raise NotFoundError(f"Message {message_id} -> Conversation {conversation_id} not found")
@@ -227,17 +229,17 @@ class MessagesManager:
 
                     cursor.execute('''
                         UPDATE messages
-                        SET delivery_status = jsonb_set(delivery_status, %s, 'true')
-                        WHERE message_id = %s
+                        SET delivery_status = jsonb_set(delivery_status, ?, 'true')
+                        WHERE message_id = ?
                     ''', (f'{{"{user_id}"}}', message_id))
 
                     # Check if message is fully delivered
-                    cursor.execute('SELECT delivery_status FROM messages WHERE message_id = %s', (message_id,))
+                    cursor.execute('SELECT delivery_status FROM messages WHERE message_id = ?', (message_id,))
                     status_result = cursor.fetchone()
                     if status_result:
                         delivery_status = json.loads(status_result[0])
                         if all(delivery_status.values()):
-                            cursor.execute('DELETE FROM messages WHERE message_id = %s', (message_id,))
+                            cursor.execute('DELETE FROM messages WHERE message_id = ?', (message_id,))
 
                 conn.commit()
         except sqlite3.Error as e:
@@ -250,7 +252,7 @@ class MessagesManager:
                 cursor = conn.cursor()
 
                 # Check if conversation exists and sender is a member
-                cursor.execute('SELECT members FROM conversations WHERE conversation_id = %s', (conversation_id,))
+                cursor.execute('SELECT members FROM conversations WHERE conversation_id = ?', (conversation_id,))
                 result = cursor.fetchone()
                 if not result:
                     raise NotFoundError("Conversation not found")
@@ -261,8 +263,8 @@ class MessagesManager:
 
                 cursor.execute('''
                     UPDATE conversations
-                    SET name = %s
-                    WHERE conversation_id = %s
+                    SET name = ?
+                    WHERE conversation_id = ?
                 ''', (new_name, conversation_id))
                 conn.commit()
         except sqlite3.Error as e:
@@ -275,7 +277,7 @@ class MessagesManager:
                 cursor = conn.cursor()
 
                 # Get current members
-                cursor.execute('SELECT members FROM conversations WHERE conversation_id = %s', (conversation_id,))
+                cursor.execute('SELECT members FROM conversations WHERE conversation_id = ?', (conversation_id,))
                 result = cursor.fetchone()
                 if not result:
                     raise NotFoundError("Conversation not found")
@@ -292,8 +294,8 @@ class MessagesManager:
                 # Update members list
                 cursor.execute('''
                     UPDATE conversations
-                    SET members = %s
-                    WHERE conversation_id = %s
+                    SET members = ?
+                    WHERE conversation_id = ?
                 ''', (json.dumps(new_members), conversation_id))
 
                 conn.commit()
@@ -307,13 +309,13 @@ class MessagesManager:
                 cursor = conn.cursor()
 
                 # Verify all users exist
-                users_manager = UsersManager()
+
                 for user_id in users_to_add:
-                    if not users_manager.is_user_id_taken(user_id):
+                    if not self.users_manager.is_user_id_taken(user_id):
                         raise NotFoundError(f"User {user_id} not found")
 
                 # Get current members
-                cursor.execute('SELECT members FROM conversations WHERE conversation_id = %s', (conversation_id,))
+                cursor.execute('SELECT members FROM conversations WHERE conversation_id = ?', (conversation_id,))
                 result = cursor.fetchone()
                 if not result:
                     raise NotFoundError("Conversation not found")
@@ -327,8 +329,8 @@ class MessagesManager:
                 # Update members list
                 cursor.execute('''
                     UPDATE conversations
-                    SET members = %s
-                    WHERE conversation_id = %s
+                    SET members = ?
+                    WHERE conversation_id = ?
                 ''', (json.dumps(new_members), conversation_id))
 
                 conn.commit()
@@ -336,28 +338,37 @@ class MessagesManager:
             raise DataBaseError(f"Failed to add users to conversation: {e}")
 
     @anti_code_injection(in_case_raise=CodeInjectionError)
-    def get_conversation_infos(self, conversation_id: str) -> Dict[str, Union[str, datetime, List[str]]]:
+    def get_all_conversations(self, user_id: str) -> List[Dict[str, Union[str, datetime, List[str]]]]:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
+
+                # Using json_each to search within the JSON array of members
                 cursor.execute('''
                     SELECT conversation_id, name, created_at, members
                     FROM conversations
-                    WHERE conversation_id = %s
-                ''', (conversation_id,))
+                    WHERE json_each.value = ?
+                    AND json_valid(members)  -- Ensure members is valid JSON
+                    AND json_type(members) = 'array'  -- Ensure members is an array
+                ''', (user_id,))
 
-                result = cursor.fetchone()
-                if not result:
-                    raise NotFoundError("Conversation not found")
+                conversations = []
+                for row in cursor.fetchall():
+                    try:
+                        conversations.append({
+                            "id": row[0],
+                            "name": row[1],
+                            "created_at": row[2],
+                            "members": json.loads(row[3])
+                        })
+                    except json.JSONDecodeError:
+                        # Skip malformed entries but continue processing others
+                        continue
 
-                return {
-                    "id": result[0],
-                    "name": result[1],
-                    "created_at": result[2],
-                    "members": json.loads(result[3])
-                }
+                return conversations
+
         except sqlite3.Error as e:
-            raise DataBaseError(f"Failed to get conversation info: {e}")
+            raise DataBaseError(f"Failed to get conversations info: {e}")
 
     @anti_code_injection(in_case_raise=CodeInjectionError)
     def delete_conversation(self, user_id: str, conversation_id: str) -> None:
@@ -366,7 +377,7 @@ class MessagesManager:
                 cursor = conn.cursor()
 
                 # Get current members
-                cursor.execute('SELECT members FROM conversations WHERE conversation_id = %s', (conversation_id,))
+                cursor.execute('SELECT members FROM conversations WHERE conversation_id = ?', (conversation_id,))
                 result = cursor.fetchone()
                 if not result:
                     raise NotFoundError("Conversation not found")
@@ -377,7 +388,7 @@ class MessagesManager:
 
                 cursor.execute('''
                        DELETE FROM conversation
-                       WHERE conversation_id = %s
+                       WHERE conversation_id = ?
                    ''', (conversation_id,))
                 conn.commit()
         except sqlite3.Error as e:

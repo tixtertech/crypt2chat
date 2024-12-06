@@ -6,6 +6,7 @@ from server.auth import AdminChallenge
 from server.exceptions import *
 from server.models import *
 from server.users.manager import UsersManager
+from server.logging import *
 
 router = APIRouter()
 users_manager = UsersManager(os.getenv("SERVER_USERS_DB"))
@@ -51,4 +52,16 @@ async def unfreeze(
         kwargs={
             'user_id':user_id
         }
+    )
+
+@router.get("/requests-per-ip")
+@http_error_handler()
+async def get_request_per_ip():
+    with open(os.getenv('ADMIN_PUBKEY'), "rb") as file:
+        pubkey = file.read()
+    return admin_challenge.get_challenge(
+        pubkey=pubkey,
+        function=requests_.get_per_ip,
+        args=[],
+        kwargs={}
     )

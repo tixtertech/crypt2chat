@@ -57,6 +57,14 @@ async def delete_message(
         message_id=message_id,
     )
 
+@router.get("/conversations")
+@http_error_handler()
+async def get_all_conversations(
+        token: dict = Depends(oauth2_scheme)
+):
+    return messages_manager.get_all_conversations(
+        user_id=token.get('sub'),
+    )
 
 @router.post("/conversation")
 @http_error_handler()

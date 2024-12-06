@@ -3,7 +3,7 @@ import hashlib
 import os
 import sqlite3
 import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone, timedelta, UTC
 
 import msgpack
 from cryptography.hazmat.backends import default_backend
@@ -410,7 +410,7 @@ class DiffieHelman:
         metadata = msgpack.loads(packed_metadata)
         encrypted_common_key = metadata['encrypted_common_key']
         encrypted_message = metadata['encrypted_message']
-        sending_date = datetime.fromtimestamp(metadata["sending_utc_timestamp"], tz=timezone.utc)
+        sending_date = datetime.fromtimestamp(metadata["sending_utc_timestamp"], tz=UTC)
 
         if not self.identity_key_pub() in encrypted_common_key:
             raise ValueError("The message is not intended for you")

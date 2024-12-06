@@ -1,8 +1,102 @@
 import logging
 import logging.config
 import os
+import sqlite3
 import time
+from collections import defaultdict
 from datetime import datetime, timezone, timedelta
+
+
+class RequestsDB:
+    def __init__(self, db_path):
+       self.db_path = db_path
+       self.conn = None
+       self._init_db()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.conn:
+            if exc_type is None:
+                self.conn.commit()
+            else:
+                self.conn.rollback()
+            self.conn.close()
+            self.conn = None
+
+    @property
+    def conn_(self):
+        """Get the current connection or create a new one if none exists."""
+        if self.conn is None:
+            self.conn = sqlite3.connect(self.db_path)
+        return self.conn
+
+    def _init_db(self):
+       try:
+           cursor = self.conn_.cursor()
+           cursor.execute('''
+               CREATE TABLE IF NOT EXISTS requests (
+                   request DATETIME,
+                   response DATETIME,
+                   runtime FLOAT,
+                   method TEXT,
+                   url TEXT,
+                   host TEXT,
+                   port INTEGER,
+                   response_code INTEGER
+               )
+           ''')
+           self.conn_.commit()
+       except sqlite3.Error as e:
+           raise ValueError(f"Database initialization failed: {e}")
+
+    def log_request(
+            self,
+            request: datetime,
+            response: datetime,
+            runtime: float,
+            method: str,
+            url: str,
+            host: str,
+            port: int,
+            response_code: int
+    ):
+        try:
+            cursor = self.conn_.cursor()
+            cursor.execute('''
+                        INSERT INTO requests (
+                            request, response, runtime, 
+                            method, url, host, port, response_code
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (request, response, runtime, method, url, host, port, response_code))
+            self.conn_.commit()
+        except sqlite3.Error as e:
+            raise ValueError(f"Failed to log request: {e}")
+
+    def get_per_ip(self):
+        try:
+            cursor = self.conn_.cursor()
+            cursor.execute('''
+                  SELECT host, method, COUNT(*), SUM(runtime)
+                  FROM requests
+                  GROUP BY host, method
+              ''')
+            results = cursor.fetchall()
+
+            # Create a dictionary to hold the aggregated results
+            aggregated_data = defaultdict(lambda: defaultdict(dict))
+
+            # Process the results and store them in the dictionary
+            for row in results:
+                host, method, count, total_runtime = row
+                aggregated_data[host][method] = {
+                    "request_count": count,
+                    "total_runtime": total_runtime
+                }
+
+            return dict(aggregated_data)
+
+        except sqlite3.Error as e:
+            raise ValueError(f"Failed to aggregate data per IP: {e}")
+
 
 
 class Logging:
@@ -37,12 +131,7 @@ class Logging:
             'version': 1,
             'disable_existing_loggers': True,
             'loggers': {
-                'middleware_logger': {
-                    'handlers': ['file'],
-                    'level': 'DEBUG',
-                    'propagate': False
-                },
-                'app_logger': {
+                'logger': {
                     'handlers': ['file'],
                     'level': 'DEBUG',
                     'propagate': False
@@ -63,35 +152,21 @@ class Logging:
         })
         logging.Formatter.converter = time.gmtime
 
-    def app_debug(self, *args, **kwargs):
-        logging.getLogger('app_logger').debug(*args, **kwargs)
+    def debug(self, *args, **kwargs):
+        logging.getLogger('logger').debug(*args, **kwargs)
 
-    def app_info(self, *args, **kwargs):
-        logging.getLogger('app_logger').info(*args, **kwargs)
+    def info(self, *args, **kwargs):
+        logging.getLogger('logger').info(*args, **kwargs)
 
-    def app_warning(self, *args, **kwargs):
-        logging.getLogger('app_logger').warning(*args, **kwargs)
+    def warning(self, *args, **kwargs):
+        logging.getLogger('logger').warning(*args, **kwargs)
 
-    def app_error(self, *args, **kwargs):
-        logging.getLogger('app_logger').error(*args, **kwargs)
+    def error(self, *args, **kwargs):
+        logging.getLogger('logger').error(*args, **kwargs)
 
-    def app_critical(self, *args, **kwargs):
-        logging.getLogger('app_logger').debug(*args, **kwargs)
-
-    def middleware_debug(self, *args, **kwargs):
-        logging.getLogger('middleware_logger').debug(*args, **kwargs)
-
-    def middleware_info(self, *args, **kwargs):
-        logging.getLogger('middleware_logger').info(*args, **kwargs)
-
-    def middleware_warning(self, *args, **kwargs):
-        logging.getLogger('middleware_logger').warning(*args, **kwargs)
-
-    def middleware_error(self, *args, **kwargs):
-        logging.getLogger('middleware_logger').error(*args, **kwargs)
-
-    def middleware_critical(self, *args, **kwargs):
-        logging.getLogger('middleware_logger').debug(*args, **kwargs)
+    def critical(self, *args, **kwargs):
+        logging.getLogger('logger').debug(*args, **kwargs)
 
 
 logging_ = Logging(os.getenv("SERVER_LOG_FILE"))
+requests_ = RequestsDB(os.getenv("SERVER_REQUESTS_DB"))

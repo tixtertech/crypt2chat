@@ -13,44 +13,43 @@ from server.keys.routes import router as keys_router
 from server.admin.routes import router as admin_router
 from server.auth.routes import router as auth_router
 from server.fastapi_security import custom_openapi
-from server.logging import logging_
+from server.logging import logging_, requests_
 from server.messaging.routes import router as messaging_router
 from server.users.routes import router as accounts_router
+from datetime import datetime, timezone, UTC
 
-logging_.app_info('server starting...')
+logging_.info('server starting...')
 app = FastAPI()
 app.openapi = lambda: custom_openapi(app)
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
-    # Log the incoming request details
     start_time = time.time()
-    logging_.middleware_info(f"Incoming request: {request.method} {request.url} from {request.client.host}")
-
-    # Process the request and get the response
     try:
         response = await call_next(request)
-
-        # Log the response details
-        process_time = time.time() - start_time
-        if response.status_code >= 500:
-            logging_.middleware_error(
-                f"Error: Status {response.status_code}"
-            )
-        logging_.middleware_info(
-            f"Response: {response.status_code} for {request.method} {request.url} "
-            f"from {request.client.host} in {process_time:.2f}s"
+        stop_time = time.time()
+        requests_.log_request(
+            request=datetime.fromtimestamp(start_time, tz=UTC),
+            response=datetime.fromtimestamp(stop_time, tz=UTC),
+            runtime=(stop_time - start_time)*1000,
+            method=request.method,
+            url=str(request.url),
+            host=request.client.host,
+            port=request.client.port,
+            response_code=response.status_code,
         )
         return response
-    except Exception as e:
-        # Log the error
-        process_time = time.time() - start_time
-        logging_.middleware_error(
-            f"Error: {e}"
-        )
-        logging_.middleware_info(
-            f"Response: 500 for {request.method} {request.url} "
-            f"from {request.client.host} in {process_time:.2f}s"
+    except:
+        stop_time = time.time()
+        requests_.log_request(
+            request=datetime.fromtimestamp(start_time, tz=UTC),
+            response=datetime.fromtimestamp(stop_time, tz=UTC),
+            runtime=(stop_time - start_time)*1000,
+            method=request.method,
+            url=str(request.url),
+            host=request.client.host,
+            port=request.client.port,
+            response_code=500,
         )
         raise
 
