@@ -1,16 +1,6 @@
-import os
-
-from fastapi import APIRouter, Query
-
-from server.auth import AdminChallenge
-from server.exceptions import *
-from server.models import *
-from server.users.manager import UsersManager
-from server.logging import *
+from server.api.dependencies import *
 
 router = APIRouter()
-users_manager = UsersManager(os.getenv("SERVER_USERS_DB"))
-admin_challenge = AdminChallenge()
 
 @router.post("/verify")
 @http_error_handler({
@@ -27,11 +17,11 @@ async def verify(base_model: Verify):
 async def freeze(
     user_id : str = Query(None, alias="user_id"),
 ):
-    with open(os.getenv('ADMIN_PUBKEY'), "rb") as file:
+    with open(conf("keys", "rsa_pub"), "rb") as file:
         pubkey = file.read()
     return admin_challenge.get_challenge(
         pubkey=pubkey,
-        function=users_manager.freeze_account,
+        function=users_.freeze_account,
         args=[],
         kwargs={
             'user_id':user_id
@@ -43,11 +33,11 @@ async def freeze(
 async def unfreeze(
     user_id : str = Query(None, alias="user_id"),
 ):
-    with open(os.getenv('ADMIN_PUBKEY'), "rb") as file:
+    with open(conf("keys", "rsa_pub"), "rb") as file:
         pubkey = file.read()
     return admin_challenge.get_challenge(
         pubkey=pubkey,
-        function=users_manager.unfreeze_account,
+        function=users_.unfreeze_account,
         args=[],
         kwargs={
             'user_id':user_id
@@ -57,7 +47,7 @@ async def unfreeze(
 @router.get("/requests-per-ip")
 @http_error_handler()
 async def get_request_per_ip():
-    with open(os.getenv('ADMIN_PUBKEY'), "rb") as file:
+    with open(conf("keys", "rsa_pub"), "rb") as file:
         pubkey = file.read()
     return admin_challenge.get_challenge(
         pubkey=pubkey,

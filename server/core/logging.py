@@ -1,14 +1,16 @@
 import logging
 import logging.config
-import os
 import sqlite3
 import time
 from collections import defaultdict
 from datetime import datetime, timezone, timedelta
 
+from server.core.config import *
+
 
 class RequestsDB:
     def __init__(self, db_path):
+       ensure_path_exists(db_path)
        self.db_path = db_path
        self.conn = None
        self._init_db()
@@ -166,7 +168,3 @@ class Logging:
 
     def critical(self, *args, **kwargs):
         logging.getLogger('logger').debug(*args, **kwargs)
-
-
-logging_ = Logging(os.getenv("SERVER_LOG_FILE"))
-requests_ = RequestsDB(os.getenv("SERVER_REQUESTS_DB"))

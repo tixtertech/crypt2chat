@@ -1,4 +1,3 @@
-import os
 import sqlite3
 from datetime import datetime, timezone
 from typing import Callable
@@ -7,10 +6,10 @@ from fastapi import Response
 
 from common.decorators import anti_code_injection
 from common.security import APIToken, RSAChallenge, ECEChallenge
-from server.exceptions import *
-from server.users import UsersManager
+from server.core.config import *
+from server.core.exceptions import *
+from server.services import users_
 
-users_manager = UsersManager(os.getenv("SERVER_USERS_DB"))
 
 class UserChallenge(ECEChallenge):
     def get_challenge(self, authentication_key:bytes, identity_key:bytes, function:Callable, args:list, kwargs:dict):
@@ -48,11 +47,11 @@ class AdminChallenge(RSAChallenge):
         )
 
 
-class TokenManager:
-
+class TokensManager:
     def __init__(self, db_path: str):
+        ensure_path_exists(db_path)
         self.db_path = db_path
-        with open(os.getenv("SERVER_X448_PRV"), "rb") as f:
+        with open(conf("keys", "x448_prv"), "rb") as f:
             self.server_privkey = f.read()
         self.api_token = APIToken(
             server_ik_prv=self.server_privkey,
@@ -113,7 +112,7 @@ class TokenManager:
     def verify_token(self, token: str, method: str, url: str, body: bytes):
         payload = self.api_token.verify_token(
             token=token,
-            user_infos=lambda id: users_manager.get_details(user_id=id),
+            get_details=lambda id: users_.get_details(user_id=id),
             method=method,
             url=url,
             body=body

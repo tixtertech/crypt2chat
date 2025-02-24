@@ -1,0 +1,35 @@
+app:
+  name: crypt2chat
+  version: 0.0.1
+  description: Crypt2chat is a secure instant messenger.
+
+var:
+  app_env: development
+  debug: true
+
+network:
+  host: 127.0.0.1
+  port: 8000
+  status: 200
+  status_msg: The server is available...
+
+logs:
+  server: ./cache/server/server.log
+
+databases:
+  users: ./cache/server/databases/users.db
+  tokens: ./cache/server/databases/tokens.db
+  messages: ./cache/server/databases/messages.db
+  requests: ./cache/server/databases/requests.db
+
+keys:
+  ed448_prv: ./cache/server/keys/ed448_prv.pem
+  ed448_pub: ./cache/server/keys/ed448_pub.pem
+  x448_prv: ./cache/server/keys/x448_prv.pem
+  x448_pub: ./cache/server/keys/x448_pub.pem
+  rsa_prv: ./cache/server/keys/rsa_prv.pem
+  rsa_pub: ./cache/server/keys/rsa_pub.pem
+  cert: ./cache/server/keys/crypt2chat_cert.pem
+
+secrets:
+  password: None

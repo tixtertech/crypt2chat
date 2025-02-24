@@ -1,19 +1,20 @@
 import json
-import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
 from typing import List, Union
 
 from common.decorators import anti_code_injection
-from server.exceptions import *
-from server.users import UsersManager
+from server.core.config import *
+from server.core.exceptions import *
+from server.services import users_
 
 
 class MessagesManager:
     def __init__(self, db_path):
+        ensure_path_exists(db_path)
         self.db_path = db_path
-        self.users_manager = UsersManager(os.getenv("SERVER_USERS_DB"))
+        self.users_manager = users_
         self._init_db()
 
     def _init_db(self):
@@ -338,7 +339,7 @@ class MessagesManager:
             raise DataBaseError(f"Failed to add users to conversation: {e}")
 
     @anti_code_injection(in_case_raise=CodeInjectionError)
-    def get_all_conversations(self, user_id: str) -> List[Dict[str, Union[str, datetime, List[str]]]]:
+    def get_update(self, user_id: str) -> List[Dict[str, Union[str, datetime, List[str]]]]:
         try:
             with sqlite3.connect(self.db_path) as conn:
                 cursor = conn.cursor()
@@ -393,3 +394,5 @@ class MessagesManager:
                 conn.commit()
         except sqlite3.Error as e:
             raise DataBaseError(f"Failed to remove users from conversation: {e}")
+
+messages_manager = MessagesManager(conf("databases", "messages"))

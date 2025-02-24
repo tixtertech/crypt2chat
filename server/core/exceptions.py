@@ -5,7 +5,7 @@ from typing import Optional, Dict, Type
 from colorama import Fore, Style
 from fastapi import HTTPException, status
 
-from server.logging import logging_
+from server.core import logging_
 
 
 class Crypt2chatError(ValueError):

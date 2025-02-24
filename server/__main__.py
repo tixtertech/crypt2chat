@@ -1,22 +1,12 @@
-import os
-
-from dotenv import load_dotenv
-
-load_dotenv()
+import time
+from datetime import datetime, UTC
 
 import uvicorn
-import time
 from fastapi import FastAPI, Response, Request
 from fastapi.responses import FileResponse
 
-from server.keys.routes import router as keys_router
-from server.admin.routes import router as admin_router
-from server.auth.routes import router as auth_router
-from server.fastapi_security import custom_openapi
-from server.logging import logging_, requests_
-from server.messaging.routes import router as messaging_router
-from server.users.routes import router as accounts_router
-from datetime import datetime, timezone, UTC
+from server.api.routes import *
+from server.core import *
 
 logging_.info('server starting...')
 app = FastAPI()
@@ -53,32 +43,33 @@ async def log_requests(request: Request, call_next):
         )
         raise
 
-@app.get("/ping")
-def ping():
-    return Response(status_code=int(os.getenv("SERVER_STATUS")), content=os.getenv("SERVER_STATUS_MESSAGE"))
+@app.get("/status")
+def status():
+    return Response(status_code=int(conf("network", "status")), content=conf("network", "status_msg"))
 
-if not int(os.getenv("SERVER_STATUS")) == 503:
+if not int(conf("network", "status")) == 503:
     @app.get("/")
     def getting_started():
-        return FileResponse(path="server/static/index.html")
+        return FileResponse(path="server/api/static/index.html")
 
     # Include routers
     app.include_router(admin_router, prefix="/admin", tags=["admin"])
     app.include_router(keys_router, prefix="/keys", tags=["keys"])
     app.include_router(auth_router, prefix="/auth", tags=["auth"])
-    app.include_router(accounts_router, prefix="/users", tags=["users"])
-    app.include_router(messaging_router, prefix="/messaging", tags=["messaging"])
+    app.include_router(users_router, prefix="/users", tags=["users"])
+    app.include_router(messages_router, prefix="/messages", tags=["messages"])
+    app.include_router(conversations_router, prefix="/conversations", tags=["conversations"])
 
 else:
     @app.get("/")
     def getting_started():
-        return FileResponse(path="server/static/unavailable.html")
+        return FileResponse(path="server/api/static/unavailable.html")
 
 uvicorn.run(
     app,
-    host=os.getenv("SERVER_HOST"),
-    port=int(os.getenv("SERVER_PORT")),
-    ssl_keyfile=os.getenv("SERVER_RSA_PRV"),
-    ssl_keyfile_password=os.getenv("SERVER_PASSWORD"),
-    ssl_certfile=os.getenv("SERVER_CERT")
+    host=conf("network", "host"),
+    port=int(conf("network", "port")),
+    ssl_keyfile=conf("keys", "rsa_prv"),
+    ssl_keyfile_password=conf("secrets", "password"),
+    ssl_certfile=conf("keys", "cert")
     )

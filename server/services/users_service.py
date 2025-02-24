@@ -7,11 +7,13 @@ from typing import List, Tuple
 import msgpack
 
 from common.decorators import anti_code_injection
-from server.exceptions import *
+from server.core.config import *
+from server.core.exceptions import *
 
 
 class UsersManager:
     def __init__(self, db_path:str):
+        ensure_path_exists(db_path)
         self.db_path = db_path
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

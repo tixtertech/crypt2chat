@@ -1,17 +1,16 @@
-import os
-
 from fastapi import FastAPI
 from fastapi import Request
 from fastapi.openapi.utils import get_openapi
 from fastapi.security import OAuth2
 
 from common.security import APIToken
-from server.auth import TokenManager
-from server.exceptions import *
+from server.core.config import *
+from server.core.exceptions import *
+from server.services.auth_service import TokensManager
 
 
 class TokenBearer(OAuth2):
-    def __init__(self, token_manager: TokenManager):
+    def __init__(self, token_manager: TokensManager):
         super().__init__()
         self.token_manager = token_manager
 
@@ -73,9 +72,9 @@ def custom_openapi(app: FastAPI):
         return app.openapi_schema
 
     openapi_schema = get_openapi(
-        title=os.getenv("NAME"),
-        version=os.getenv("VERSION"),
-        description=os.getenv("DESCRIPTION"),
+        title=conf("app", "name"),
+        version=conf("app", "version"),
+        description=conf("app", "description"),
         routes=app.routes,
     )
 
@@ -94,5 +93,3 @@ def custom_openapi(app: FastAPI):
 
     app.openapi_schema = openapi_schema
     return app.openapi_schema
-
-oauth2_scheme = TokenBearer(TokenManager(os.getenv("SERVER_TOKENS_DB")))
